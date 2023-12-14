@@ -123,12 +123,16 @@ var_domain_record_id=""
 
 #是否启用消息推送
 var_enable_message_push=false
+var_enable_message_pushplus=false
 #推送地址
 var_push_message_api="https://oapi.dingtalk.com/robot/send"
 #加签密钥
 var_push_message_secret=""
 #消息推送token
 var_push_message_access_token=""
+#pushplus推送token
+var_push_plus_url="http://www.pushplus.plus/send"
+var_push_plus_token=""
 
 #==================函数====================
 
@@ -491,6 +495,15 @@ function fun_set_config(){
         [[ -z "${var_domain_server_ip}" ]] && echo -e "${message_info_tag}输入为空值,已设置执行命令为:“nslookup“" && var_domain_server_ip="nslookup"
     fi
 
+    
+    # 是否启用pushplus消息推送,默认:false
+    if [[ "${var_enable_message_pushplus}" = false ]]; then
+        echo -e "\n${message_info_tag}[var_enable_message_pushplus]请输入是否启用消息通知(pushplus)推送(请输入true或false):"
+        read -p "(默认false,如有疑问请输入“-h”查看帮助):" var_enable_message_pushplus
+        [[ "${var_enable_message_pushplus}" = "-h" ]] && fun_help_document "var_enable_message_pushplus" && echo -e "${message_info_tag}[var_enable_message_pushplus]请输入是否启用消息通知(pushplus)推送(请输入true或false):" && read -p "(默认false):" var_enable_message_pushplus
+        [[ -z "${var_enable_message_pushplus}" ]] && echo -e "${message_info_tag}输入为空值,已设置为:false" && var_enable_message_pushplus=false
+    fi
+    
     # 是否启用消息推送,默认:false
     if [[ "${var_enable_message_push}" = false ]]; then
         echo -e "\n${message_info_tag}[var_enable_message_push]请输入是否启用消息通知(钉钉机器人)推送(请输入true或false):"
@@ -648,6 +661,14 @@ function fun_help_document(){
             你也可以自定义获取域名当前解析IP方式。输入格式为需要执行的命令且不能出现双引号(\")。
             参考:“curl -s http://119.29.29.29/d?dn=\$var_second_level_domain.\$var_first_level_domain”"
             var_domain_server_ip=""
+        ;;
+	
+        "var_enable_message_pushplus")
+            echo -e "${message_info_tag}${color_green_start}[${help_type}]是否启用消息推送(pushplus)-说明${color_end}
+            此参数决定是否启用pushplus消息通知控制。
+            当脚本执行失败或成功将通过pushplus通知。
+            更多信息与配置请看pushplus官方文档。"
+            var_enable_message_pushplus=""
         ;;
          "var_enable_message_push")
             echo -e "${message_info_tag}${color_green_start}[${help_type}]是否启用消息推送-说明${color_end}
@@ -829,6 +850,11 @@ function fun_push_message(){
         fun_send_message_to_ding_ding "{'msgtype': 'text','text':{'content': '【域名解析服务-${NOW_DATE}】$1'}}"
     fi
 
+    if [[ "${var_enable_message_pushplus}" = true ]]; then
+        fun_wirte_log "${message_info_tag}正在推送消息到pushplus......"
+	fun_send_message_to_pushplus "【消息通知】" "【域名解析服务-${NOW_DATE}】$1"
+    fi
+
 }
 #发送消息到钉钉 fun_send_message_to_ding_ding "内容"
 function fun_send_message_to_ding_ding(){
@@ -850,6 +876,33 @@ function fun_send_message_to_ding_ding(){
         fi
 }
 
+#urlencode函数 func_url_encode "内容"
+#本函数可以处理带空格的字符串
+function func_url_encode() {
+ encoded=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$1'))")
+ echo $encoded
+}
+
+#发送消息到pushplus fun_send_message_to_pushplus "标题" "内容"
+function fun_send_message_to_pushplus() {
+	local pushplus_title=$(func_url_encode "$1")
+	local pushplus_content=$(func_url_encode "$2")
+        local request_url="$var_push_plus_url?token=$var_push_plus_token&title=$pushplus_title&content=$pushplus_content&template=html"
+        fun_wirte_log "${message_info_tag}pushplus接口推送请求信息:${request_url}" false
+	# 发送请求
+        local response=$(curl -s "${request_url}" -H "Content-Type: application/json" -d "$1")
+        fun_wirte_log "${message_info_tag}pushplus接口推送返回信息:${response}" false
+        # json解析
+        local errcode=$(fun_parse_json "$response" "code")
+        local errmsg=$(fun_parse_json "$response" "msg")
+        if [[ "$errcode" -eq "200" ]]; then
+            fun_wirte_log "${message_success_tag}消息推送成功,返回消息:${errmsg}"
+        else
+           fun_wirte_log "${message_warning_tag}消息推送失败,返回消息:${errmsg}"
+        fi
+}
+
+
 # 恢复出厂设置
 function fun_restore_settings(){
     fun_setting_file_save_dir
@@ -865,6 +918,7 @@ function fun_restore_settings(){
     var_local_wan_ip=""
     var_domain_server_ip=""
     var_enable_message_push=false
+    var_enable_message_pushplus=false
     var_push_message_access_token=""
     var_push_message_secret=""
     var_domain_record_type=""
