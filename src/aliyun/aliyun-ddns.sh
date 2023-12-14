@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #版本信息
-build_date="20200307"
-build_version="v1.0.0"
+build_date="20231214"
+build_version="v1.0.1"
 
 #当前时间 格式：2020-03-12 14:36:31
 NOW_DATE=$(date "+%Y-%m-%d %H:%M:%S")
@@ -348,6 +348,7 @@ function fun_check_config_file(){
         || [[ "${var_domain_server_ip}" = "" ]] || [[ "${var_check_online_url}" = "" ]] || [[ "${var_check_online_retry_times}" = "" ]] \
         || [[ "${var_aliyun_ddns_api_host}" = "" ]] \
         || [[ "${var_enable_message_push}" = true && "${var_push_message_access_token}" = "" && "${var_push_message_secret}" = "" ]] \
+        || [[ "${var_enable_message_pushplus}" = true && "${var_push_plus_token}" = "" ]] \
         || [[ "${var_check_online_url}" = "" ]] \
         || [[ "${var_domain_record_type}" = "" ]] \
         || [[ "${var_check_online_retry_times}" = "" ]] ; then
@@ -503,6 +504,25 @@ function fun_set_config(){
         [[ "${var_enable_message_pushplus}" = "-h" ]] && fun_help_document "var_enable_message_pushplus" && echo -e "${message_info_tag}[var_enable_message_pushplus]请输入是否启用消息通知(pushplus)推送(请输入true或false):" && read -p "(默认false):" var_enable_message_pushplus
         [[ -z "${var_enable_message_pushplus}" ]] && echo -e "${message_info_tag}输入为空值,已设置为:false" && var_enable_message_pushplus=false
     fi
+	
+	# pushplus消息通知发送token
+    if [[ "${var_enable_message_pushplus}" = true && "${var_push_plus_token}" = "" ]]; then
+        echo -e "\n${message_info_tag}[var_push_plus_token]请输入pushplus推送access_token${color_red_start}(*)${color_end}"
+        read -p "(此项为必填,如有疑问请输入“-h”查看帮助):" var_push_plus_token
+        [[ "${var_push_plus_token}" = "-h" ]] && fun_help_document "var_push_plus_token" && echo -e "${message_info_tag}[var_push_plus_token]请输入pushplus推送access_token" && read -p "(此项为必填,如有疑问请输入“-h”查看帮助):" var_push_plus_token
+        while [[ "${var_push_plus_token}" = "" || "${var_push_plus_token}" = "-h" ]]
+        do
+            if [[ "${var_push_plus_token}" = "" ]]; then
+                echo -e "${message_error_tag}此项不可为空,请重新输入!"
+                echo -e "${message_info_tag}[var_push_plus_token]请输入pushplus推送access_token${color_red_start}(*)${color_end}"
+                read -p "(此项为必填,如有疑问请输入“-h”查看帮助):" var_push_plus_token
+                elif [[ "${var_push_plus_token}" = "-h"  ]]; then
+                fun_help_document "var_push_plus_token"
+                echo -e "${message_info_tag}[var_push_plus_token]请输入pushplus推送access_token${color_red_start}(*)${color_end}"
+                read -p "(此项为必填,如有疑问请输入“-h”查看帮助):" var_push_plus_token
+            fi
+        done
+    fi
     
     # 是否启用消息推送,默认:false
     if [[ "${var_enable_message_push}" = false ]]; then
@@ -569,6 +589,8 @@ function fun_save_config(){
     var_access_key_secret="${var_access_key_secret}"
     var_local_wan_ip="${var_local_wan_ip}"
     var_domain_server_ip="${var_domain_server_ip}"
+    var_enable_message_pushplus="${var_enable_message_pushplus}"
+    var_push_plus_token="${var_push_plus_token}"
     var_enable_message_push=${var_enable_message_push}
     var_push_message_access_token="${var_push_message_access_token}"
     var_push_message_secret="${var_push_message_secret}"
@@ -669,6 +691,13 @@ function fun_help_document(){
             当脚本执行失败或成功将通过pushplus通知。
             更多信息与配置请看pushplus官方文档。"
             var_enable_message_pushplus=""
+        ;;
+		"var_push_plus_token")
+            echo -e "${message_info_tag}${color_green_start}[${help_type}]消息推送密钥-说明${color_end}
+            此参数为pushplus推送消息的access_token。
+            Webhook地址参数token=后的值。
+            更多信息与配置请看pushplus官方文档"
+            var_push_plus_token=""
         ;;
          "var_enable_message_push")
             echo -e "${message_info_tag}${color_green_start}[${help_type}]是否启用消息推送-说明${color_end}
@@ -852,7 +881,7 @@ function fun_push_message(){
 
     if [[ "${var_enable_message_pushplus}" = true ]]; then
         fun_wirte_log "${message_info_tag}正在推送消息到pushplus......"
-	fun_send_message_to_pushplus "【消息通知】" "【域名解析服务-${NOW_DATE}】$1"
+	fun_send_message_to_pushplus "【消息通知】" "【域名解析服务 ${NOW_DATE}】$1"
     fi
 
 }
@@ -917,8 +946,9 @@ function fun_restore_settings(){
     var_access_key_secret=""
     var_local_wan_ip=""
     var_domain_server_ip=""
-    var_enable_message_push=false
     var_enable_message_pushplus=false
+    var_push_plus_token=""
+    var_enable_message_push=false
     var_push_message_access_token=""
     var_push_message_secret=""
     var_domain_record_type=""
@@ -998,6 +1028,25 @@ function main_fun_show_version(){
     exit 0
 }
 
+#执行推送函数
+function main_fun_only_push(){
+    fun_check_config_file
+    if [[ "${var_is_exist_config_file}" != true ]]; then
+        fun_wirte_log "${message_error_tag}未检测到配置文件,请直接运行程序配置!"
+        exit 1
+    fi
+    fun_check_run_environment
+    fun_install_run_environment
+    fun_check_online
+    fun_get_local_wan_ip
+    fun_get_domain_server_ip
+    fun_get_now_timestamp
+    fun_push_message "$1"
+    exit 0
+}
+
+
+
 # 根据输入参数执行对应函数
 case "$1" in
     "-config -run")
@@ -1005,6 +1054,9 @@ case "$1" in
     ;;
     "-run")
         main_fun_only_run
+    ;;
+    "-push")
+        main_fun_only_push "$2"
     ;;
     "-config")
         main_fun_only_config
@@ -1023,6 +1075,7 @@ case "$1" in
 使用方法 (Usage):
 aliyun-ddns.sh -config -run     配置并执行脚本
 aliyun-ddns.sh -run             执行脚本（前提需要有配置文件）
+aliyun-ddns.sh -push <content>  推送消息（前提需要有配置文件配置了推送信息）
 aliyun-ddns.sh -config          仅配置信息
 aliyun-ddns.sh -restore         恢复出厂设置（会清除配置文件等）
 aliyun-ddns.sh -clearn          清理日志文件
@@ -1032,7 +1085,7 @@ aliyun-ddns.sh -version         显示脚本说明及版本信息
 esac
 
 echo -e "${message_info_tag}选择需要执行的功能"
-echo -e "\n 1.配置并执行脚本 \n 2.仅配置 \n 3.仅执行脚本 \n 4.恢复出厂设置 \n 5.清理日志文件 \n 0.退出 \n"
+echo -e "\n 1.配置并执行脚本 \n 2.仅配置 \n 3.仅执行脚本 \n 4.恢复出厂设置 \n 5.清理日志文件 \n 6.仅推送消息 \n 0.退出 \n"
 read -p "请输入你的选择（输入数字）:" run_function
 
 if [[ "${run_function}" == "1" ]]; then
@@ -1045,6 +1098,11 @@ if [[ "${run_function}" == "1" ]]; then
     main_fun_restore_settings
     elif [[ "${run_function}" == "5" ]]; then
     main_fun_clearn_logs
+    elif [[ "${run_function}" == "6" ]]; then
+    local var_push_text=""
+    echo -e "\n${message_info_tag}[var_push_text]请输入推送内容:"
+    read -p "请输入推送内容:" var_push_text
+    main_fun_only_push "$var_push_text"
 else
     exit 0
 fi
