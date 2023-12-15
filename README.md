@@ -1,6 +1,9 @@
 # 阿里云域名动态IP解析Shell小脚本
 当你手里面有一个闲置的域名，有一个漂浮不定的外网ip，你又想在外网ip变更后自动解析到域名上，此情此景此脚本可能会帮上你。
 # 更新日志
+## 项目fork自https://github.com/risfeng/aliyun-ddns-shell，需了解更多可关注原作者
+
+- 2023-12-14 支持pushplus消息推送，支持单独推送消息
 - 2020-09-29 支持IPV6解析（支持设置解析记录类型：A、NS、MX、TXT、CNAME、SRV、AAAA、CAA、REDIRECT_URL、FORWARD_URL）
 - 2021-09-06 支持设置解析线路
 ---
@@ -17,10 +20,11 @@
     - 创建新的AccessKey https://ram.console.aliyun.com/users/domain
     - 给子账号授权：权限管理-个人权限 权限策略名称：AliyunDNSFullAccess
 - 运行自动解析域名脚本
-    - git clone https://github.com/risfeng/aliyun-ddns-shell.git
+    - git clone https://github.com/aby1987/aliyun-ddns-shell.git
     - 给aliyun-ddns.sh脚本赋可执行权：`chmod +x aliyun-ddns-shell/src/aliyun/aliyun-ddns.sh`
     - 运行脚本，根据提示进行配置（第一次运行需要配置）
     - 如需要使用钉钉自定义机器人推送成功失败消息，请新建自定义钉钉机器人，配置access_token和消息加签密钥
+    - 如需要使用pushplus消息推送服务,需要再pushplus网站扫码登陆后在一对一消息推送中获取推送token
     - 脚本支持2种运行方式：
         - 直接运行脚本根据提示选择需要使用的功能
         ```
@@ -30,12 +34,15 @@
         3.仅执行脚本
         4.恢复出厂设置
         5.清理日志文件
+        6.仅推送消息(支持空格字符)
         0.退出
         ```
         - 带参数运行：
         ```
-        aliyun-ddns.sh -config -run     配置并执行脚
+        aliyun-ddns.sh -config -run     配置并执行脚本
+
         aliyun-ddns.sh -run             执行脚本（前提需要有配置文件）
+        aliyun-ddns.sh -push <content>  推送消息（前提需要有配置文件）
         aliyun-ddns.sh -config          仅配置信息
         aliyun-ddns.sh -restore         恢复出厂设置（会清除配置文件等）
         aliyun-ddns.sh -clearn          清理日志文件
